@@ -7,6 +7,9 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+app.get('/', (req, res) => {
+    res.send('Hello World! Your backend is successfully deployed.');
+});
 // Routes
 app.use('/api', quoteRoutes);
 
