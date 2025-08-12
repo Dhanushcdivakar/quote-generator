@@ -1,137 +1,137 @@
+// generateQuotePDF.js
 const fs = require('fs');
 const path = require('path');
 
-// Conditionally require packages based on environment
-let puppeteer;
-let chromium;
+let puppeteer = null;
+let chromium = null;
+let usingServerlessChromium = false;
 
-// Vercel's environment variable to detect production.
-const isVercel = process.env.VERCEL_ENV === "production";
-
-if (isVercel) {
-    // Use puppeteer-core and @sparticuz/chromium on Vercel
-    puppeteer = require('puppeteer-core');
-    chromium = require('@sparticuz/chromium');
-} else {
-    // Use the standard puppeteer package for local development
+// Try to prefer serverless chrome (puppeteer-core + @sparticuz/chromium).
+// If that package set isn't available, fallback to local puppeteer.
+try {
+  // prefer serverless packages when available (these should be in production dependencies)
+  chromium = require('@sparticuz/chromium');
+  puppeteer = require('puppeteer-core');
+  usingServerlessChromium = true;
+  console.log('[generateQuotePDF] Using puppeteer-core + @sparticuz/chromium (serverless)');
+} catch (err) {
+  try {
+    // local fallback for development (puppeteer should be installed locally as devDependency)
     puppeteer = require('puppeteer');
+    console.log('[generateQuotePDF] Using full puppeteer (local dev fallback)');
+  } catch (err2) {
+    console.error('[generateQuotePDF] No puppeteer package found. Install puppeteer locally for dev or ensure puppeteer-core + @sparticuz/chromium are in production dependencies.');
+    throw err2;
+  }
 }
 
 /**
  * Generates a PDF quote from a dynamic data object and HTML template.
- * @param {object} data - The data object containing form details and items.
- * @param {string} data.customerName - The customer's name.
- * @param {string} data.description - A general description for the job.
- * @param {number} data.rate - The rate per unit (e.g., per mm).
- * @param {array} data.items - An array of item objects.
- * @param {object} data.items[].pathLengthArea - The path length or area of the item.
- * @param {object} data.items[].thickness - The thickness of the item.
- * @param {object} data.items[].passes - The number of passes for the item.
- * @param {object} data.items[].quantity - The quantity of the item.
- * @returns {Promise<Buffer>} - A promise that resolves to the PDF buffer.
+ * @param {object} data
+ * @returns {Promise<Buffer>}
  */
 async function generateQuotePDF(data) {
-    let html;
-    try {
-        const templatePath = path.join(__dirname, 'template.html');
-        html = fs.readFileSync(templatePath, 'utf8');
-    } catch (error) {
-        console.error('Error reading template.html file:', error.message);
-        throw new Error('Could not find or read HTML template file.');
+  let html;
+  try {
+    const templatePath = path.join(__dirname, 'template.html');
+    html = fs.readFileSync(templatePath, 'utf8');
+  } catch (error) {
+    console.error('[generateQuotePDF] Error reading template.html:', error.message);
+    throw new Error('Could not find or read HTML template file.');
+  }
+
+  // logo fallback
+  let logoDataUri = 'https://placehold.co/150x50/cccccc/333333?text=Logo+Missing';
+  try {
+    const logoPath = path.join(__dirname, '..', 'logo-placeholder.png');
+    const logoBase64 = fs.readFileSync(logoPath).toString('base64');
+    logoDataUri = `data:image/png;base64,${logoBase64}`;
+  } catch (error) {
+    console.warn('[generateQuotePDF] Logo not found, using placeholder.', error.message);
+  }
+
+  // build items html & compute totals
+  let finalTotal = 0;
+  let itemsHTML = '';
+  (data.items || []).forEach((item, idx) => {
+    const pathLengthArea = parseFloat(item.pathLengthArea || 0);
+    const passes = parseFloat(item.passes || 0);
+    const quantity = parseFloat(item.quantity || 0);
+    const rate = parseFloat(data.rate || 0);
+
+    const unitTotal = pathLengthArea * passes * rate;
+    const itemTotal = unitTotal * quantity;
+    finalTotal += itemTotal;
+
+    itemsHTML += `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${data.description || ''}</td>
+        <td>${quantity}</td>
+        <td>₹${unitTotal.toFixed(2)}</td>
+        <td>₹${itemTotal.toFixed(2)}</td>
+      </tr>`;
+  });
+
+  html = html
+    .replace('{{logoBase64}}', logoDataUri)
+    .replace('{{quoteNumber}}', 'Q-' + Date.now().toString().slice(-4))
+    .replace('{{date}}', new Date().toLocaleDateString())
+    .replace('{{dueDate}}', new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toLocaleDateString())
+    .replace('{{customerName}}', data.customerName || '')
+    .replace('{{items}}', itemsHTML)
+    .replace('{{finalTotal}}', '₹' + finalTotal.toFixed(2));
+
+  let browser = null;
+
+  try {
+    // Build launch options depending on environment
+    const launchOptions = { dumpio: true, timeout: 120000 };
+
+    if (usingServerlessChromium && chromium) {
+      // Use the chromium package's defaults — do NOT append/override important args.
+      launchOptions.args = chromium.args || [];
+      // chromium.executablePath() returns appropriate path for serverless environment
+      launchOptions.executablePath = await chromium.executablePath();
+      launchOptions.headless = chromium.headless;
+      launchOptions.defaultViewport = chromium.defaultViewport || { width: 1280, height: 800 };
+      launchOptions.ignoreHTTPSErrors = true;
+
+      console.log('[generateQuotePDF] Launching serverless chromium with args:', launchOptions.args);
+    } else {
+      // Local dev fallback
+      launchOptions.headless = 'new';
+      launchOptions.args = ['--no-sandbox', '--disable-setuid-sandbox'];
+      launchOptions.defaultViewport = { width: 1280, height: 800 };
+
+      console.log('[generateQuotePDF] Launching local puppeteer with args:', launchOptions.args);
     }
 
-    let logoDataUri = 'https://placehold.co/150x50/cccccc/333333?text=Logo+Missing';
-    try {
-        const logoPath = path.join(__dirname, '..', 'logo-placeholder.png');
-        const logoBase64 = fs.readFileSync(logoPath).toString('base64');
-        logoDataUri = `data:image/png;base64,${logoBase64}`;
-    } catch (error) {
-        console.error('Error reading logo file. Falling back to placeholder image.', error.message);
-    }
+    browser = await puppeteer.launch(launchOptions);
+  } catch (e) {
+    console.error('[generateQuotePDF] Failed to launch browser:', e && e.message ? e.message : e);
+    // Give a clear, actionable error message for logs
+    throw new Error(`Browser failed to launch. ${usingServerlessChromium ? 'If running on Vercel check that @sparticuz/chromium is in dependencies and the runtime env var is correct.' : 'If local, ensure you have puppeteer installed locally.'} Raw error: ${e.message || e}`);
+  }
 
-    let finalTotal = 0;
-    let itemsHTML = '';
-
-    (data.items || []).forEach((item, idx) => {
-        const pathLengthArea = parseFloat(item.pathLengthArea || 0);
-        const passes = parseFloat(item.passes || 0);
-        const quantity = parseFloat(item.quantity || 0);
-        const rate = parseFloat(data.rate || 0);
-
-        const unitTotal = pathLengthArea * passes * rate;
-        const itemTotal = unitTotal * quantity;
-        finalTotal += itemTotal;
-
-        itemsHTML += `
-        <tr>
-          <td>${idx + 1}</td>
-          <td>${data.description} </td>
-          <td>${quantity}</td>
-          <td>₹${unitTotal.toFixed(2)}</td>
-          <td>₹${itemTotal.toFixed(2)}</td>
-        </tr>`;
-    });
-
-    html = html
-      .replace('{{logoBase64}}', logoDataUri)
-      .replace('{{quoteNumber}}', 'Q-' + Date.now().toString().slice(-4))
-      .replace('{{date}}', new Date().toLocaleDateString())
-      .replace('{{dueDate}}', new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toLocaleDateString())
-      .replace('{{customerName}}', data.customerName || '')
-      .replace('{{items}}', itemsHTML)
-      .replace('{{finalTotal}}', '₹' + finalTotal.toFixed(2));
-
-    // --- REVISED PUPPETEER LAUNCH CODE ---
-    let browser;
-    try {
-        if (isVercel) {
-            // Use a comprehensive set of launch args for serverless environments.
-            browser = await puppeteer.launch({
-                args: [
-                    ...chromium.args,
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--single-process',
-                    '--disable-gpu',
-                    '--disable-software-rasterizer',
-                    // The following argument is often needed to bypass the libnss3.so issue.
-                    '--disable-features=site-per-process'
-                ],
-                executablePath: await chromium.executablePath(),
-                headless: chromium.headless,
-            });
-        } else {
-            // Standard launch for local development
-            browser = await puppeteer.launch({
-                headless: 'new',
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
-            });
-        }
-    } catch (e) {
-        console.error('Failed to launch browser:', e);
-        throw new Error(`Browser failed to launch. The underlying error is likely a missing dependency.
-            Please ensure you have run 'npm install' and that your package versions
-            are compatible with the Vercel runtime. Error: ${e.message}`);
-    }
-    // --- END OF REVISED CODE ---
-
+  try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
     const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: {
-            top: '20px',
-            right: '40px',
-            bottom: '40px',
-            left: '40px'
-        }
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '20px', right: '40px', bottom: '40px', left: '40px' }
     });
 
-    await browser.close();
     return pdfBuffer;
+  } finally {
+    try {
+      if (browser) await browser.close();
+    } catch (closeErr) {
+      console.warn('[generateQuotePDF] Error closing browser:', closeErr && closeErr.message ? closeErr.message : closeErr);
+    }
+  }
 }
 
 module.exports = generateQuotePDF;
