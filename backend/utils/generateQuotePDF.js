@@ -1,6 +1,20 @@
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
+
+// Conditionally require packages based on environment
+let puppeteer;
+let chromium;
+
+const isVercel = process.env.VERCEL_ENV === "production";
+
+if (isVercel) {
+  // Use puppeteer-core and @sparticuz/chromium on Vercel
+  puppeteer = require('puppeteer-core');
+  chromium = require('@sparticuz/chromium');
+} else {
+  // Use the standard puppeteer package for local development
+  puppeteer = require('puppeteer');
+}
 
 /**
  * Generates a PDF quote from a dynamic data object and HTML template.
@@ -24,26 +38,20 @@ async function generateQuotePDF(data) {
 
     // Try to read the logo file and convert it to a Base64 string
     try {
-        // Updated path to be more explicit
         const logoPath = path.join(__dirname, '..', 'logo-placeholder.png');
         const logoBase64 = fs.readFileSync(logoPath).toString('base64');
         logoDataUri = `data:image/png;base64,${logoBase64}`;
     } catch (error) {
-        // If the file is not found or cannot be read, log the error
         console.error('Error reading logo file. Falling back to placeholder image.', error.message);
     }
 
     let finalTotal = 0;
     let itemsHTML = '';
 
-    // Loop through the dynamic items from the frontend
     (data.items || []).forEach((item, idx) => {
-        // Calculate the total for a single unit of the item
         const unitTotal = parseFloat(item.pathLengthArea) * parseFloat(item.passes) * parseFloat(data.rate);
-        // Calculate the total amount for all units of this item
         const itemTotal = unitTotal * parseFloat(item.quantity);
-
-        finalTotal += itemTotal; // Add to the final total
+        finalTotal += itemTotal;
 
         itemsHTML += `
         <tr>
@@ -55,37 +63,48 @@ async function generateQuotePDF(data) {
         </tr>`;
     });
 
-    // Replace dynamic placeholders in the HTML
     html = html
-      .replace('{{logoBase64}}', logoDataUri) // Replace the logo placeholder with the Base64 data URI
-      .replace('{{quoteNumber}}', 'Q-' + Date.now().toString().slice(-4)) // Generate a simple quote number
+      .replace('{{logoBase64}}', logoDataUri)
+      .replace('{{quoteNumber}}', 'Q-' + Date.now().toString().slice(-4))
       .replace('{{date}}', new Date().toLocaleDateString())
-      .replace('{{dueDate}}', new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toLocaleDateString()) // 30 days from now
+      .replace('{{dueDate}}', new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toLocaleDateString())
       .replace('{{customerName}}', data.customerName || '')
       .replace('{{items}}', itemsHTML)
       .replace('{{finalTotal}}', '₹' + finalTotal.toFixed(2));
 
-    // Launch Puppeteer to create PDF
-    const browser = await puppeteer.launch({
-      headless: 'new', // recommended for latest Puppeteer
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    // --- REVISED PUPPETEER LAUNCH CODE ---
+    let browser;
+    if (isVercel) {
+        // Launch with @sparticuz/chromium on Vercel
+        browser = await puppeteer.launch({
+            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
+        });
+    } else {
+        // Standard launch for local development
+        browser = await puppeteer.launch({
+            headless: 'new', // or true
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+    }
+    // --- END OF REVISED CODE ---
+
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
-    // Generate PDF with explicit margins
-    const pdfBuffer = await page.pdf({ 
-      format: 'A4', 
-      printBackground: true,
-      margin: {
-        top: '20px',
-        right: '40px',
-        bottom: '40px',
-        left: '40px'
-      }
+    const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+            top: '20px',
+            right: '40px',
+            bottom: '40px',
+            left: '40px'
+        }
     });
-    await browser.close();
 
+    await browser.close();
     return pdfBuffer;
 }
 
