@@ -1,19 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 
-// Conditionally require packages based on environment
 let puppeteer;
 let chromium;
 
-// Vercel's environment variable to detect production.
-const isVercel = process.env.VERCEL_ENV === "production";
+// Detect if running in AWS Lambda / Vercel serverless
+const isLambda = !!process.env.AWS_EXECUTION_ENV;
 
-if (isVercel) {
-    // Use puppeteer-core and @sparticuz/chromium on Vercel
+if (isLambda) {
     puppeteer = require('puppeteer-core');
     chromium = require('@sparticuz/chromium');
 } else {
-    // Use the standard puppeteer package for local development
     puppeteer = require('puppeteer');
 }
 
@@ -65,7 +62,7 @@ async function generateQuotePDF(data) {
         itemsHTML += `
         <tr>
           <td>${idx + 1}</td>
-          <td>${data.description} </td>
+          <td>${data.description}</td>
           <td>${quantity}</td>
           <td>₹${unitTotal.toFixed(2)}</td>
           <td>₹${itemTotal.toFixed(2)}</td>
@@ -81,28 +78,18 @@ async function generateQuotePDF(data) {
       .replace('{{items}}', itemsHTML)
       .replace('{{finalTotal}}', '₹' + finalTotal.toFixed(2));
 
-    // --- REVISED PUPPETEER LAUNCH CODE ---
+    // --- FIXED PUPPETEER LAUNCH CODE ---
     let browser;
     try {
-        if (isVercel) {
-            // Use a comprehensive set of launch args for serverless environments.
+        if (isLambda) {
             browser = await puppeteer.launch({
-                args: [
-                    ...chromium.args,
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--single-process',
-                    '--disable-gpu',
-                    '--disable-software-rasterizer',
-                    // The following argument is often needed to bypass the libnss3.so issue.
-                    '--disable-features=site-per-process'
-                ],
+                args: chromium.args,
                 executablePath: await chromium.executablePath(),
                 headless: chromium.headless,
+                defaultViewport: chromium.defaultViewport,
+                ignoreHTTPSErrors: true
             });
         } else {
-            // Standard launch for local development
             browser = await puppeteer.launch({
                 headless: 'new',
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -110,11 +97,9 @@ async function generateQuotePDF(data) {
         }
     } catch (e) {
         console.error('Failed to launch browser:', e);
-        throw new Error(`Browser failed to launch. The underlying error is likely a missing dependency.
-            Please ensure you have run 'npm install' and that your package versions
-            are compatible with the Vercel runtime. Error: ${e.message}`);
+        throw new Error(`Browser failed to launch. Error: ${e.message}`);
     }
-    // --- END OF REVISED CODE ---
+    // --- END OF FIX ---
 
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
