@@ -5,8 +5,7 @@ const path = require('path');
 let puppeteer;
 let chromium;
 
-// The Vercel environment sets this variable automatically,
-// which is why an .env file isn't needed for this logic.
+// Vercel's environment variable to detect production.
 const isVercel = process.env.VERCEL_ENV === "production";
 
 if (isVercel) {
@@ -32,7 +31,6 @@ if (isVercel) {
  * @returns {Promise<Buffer>} - A promise that resolves to the PDF buffer.
  */
 async function generateQuotePDF(data) {
-    // Use a try-catch block to handle file reading errors gracefully.
     let html;
     try {
         const templatePath = path.join(__dirname, 'template.html');
@@ -42,10 +40,7 @@ async function generateQuotePDF(data) {
         throw new Error('Could not find or read HTML template file.');
     }
 
-    // Initialize logoDataUri with a fallback placeholder URL
     let logoDataUri = 'https://placehold.co/150x50/cccccc/333333?text=Logo+Missing';
-
-    // Try to read the logo file and convert it to a Base64 string
     try {
         const logoPath = path.join(__dirname, '..', 'logo-placeholder.png');
         const logoBase64 = fs.readFileSync(logoPath).toString('base64');
@@ -57,9 +52,7 @@ async function generateQuotePDF(data) {
     let finalTotal = 0;
     let itemsHTML = '';
 
-    // Safely iterate over items, defaulting to an empty array if not present.
     (data.items || []).forEach((item, idx) => {
-        // Ensure values are numbers before calculation.
         const pathLengthArea = parseFloat(item.pathLengthArea || 0);
         const passes = parseFloat(item.passes || 0);
         const quantity = parseFloat(item.quantity || 0);
@@ -92,23 +85,34 @@ async function generateQuotePDF(data) {
     let browser;
     try {
         if (isVercel) {
-            // Launch with @sparticuz/chromium on Vercel with robust args.
+            // Use a comprehensive set of launch args for serverless environments.
             browser = await puppeteer.launch({
-                args: [...chromium.args, '--disable-setuid-sandbox', '--no-sandbox'],
+                args: [
+                    ...chromium.args,
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--single-process',
+                    '--disable-gpu',
+                    '--disable-software-rasterizer',
+                    // The following argument is often needed to bypass the libnss3.so issue.
+                    '--disable-features=site-per-process'
+                ],
                 executablePath: await chromium.executablePath(),
                 headless: chromium.headless,
-                ignoreDefaultArgs: ['--disable-extensions'],
             });
         } else {
             // Standard launch for local development
             browser = await puppeteer.launch({
-                headless: 'new', // or true
+                headless: 'new',
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
         }
     } catch (e) {
         console.error('Failed to launch browser:', e);
-        throw new Error('Browser failed to launch. Check Vercel logs for missing dependencies.');
+        throw new Error(`Browser failed to launch. The underlying error is likely a missing dependency.
+            Please ensure you have run 'npm install' and that your package versions
+            are compatible with the Vercel runtime. Error: ${e.message}`);
     }
     // --- END OF REVISED CODE ---
 
