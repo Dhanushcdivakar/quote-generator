@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quote</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* General body and font styles */
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        .invoice-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px; /* Reduced the top margin */
+            background-color: #fff;
+            border: 1px solid #ddd;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Header Section */
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center; /* Aligns items vertically in the center */
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .header-left {
+            display: flex; /* Use flexbox to align logo and company info */
+            align-items: center;
+        }
+        
+        .header-left .logo {
+            max-width: 150px;
+            height: auto;
+            margin-right: 20px; /* Add space between logo and text */
+        }
+
+        .header-left h2 {
+            margin: 0;
+            color: #007bff;
+        }
+
+        .header-left p {
+            margin: 2px 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .header-right {
+            text-align: right;
+        }
+
+        .header-right h1 {
+            color: #007bff;
+            margin: 0;
+            font-size: 36px;
+        }
+
+        .invoice-details p {
+            margin: 2px 0;
+            font-size: 14px;
+        }
+
+        /* Bill To Section */
+        .bill-to-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #e9ecef;
+            background-color: #f8f9fa;
+        }
+
+        .bill-to-section h3 {
+            margin-top: 0;
+            color: #555;
+            font-size: 18px;
+        }
+
+        .bill-to-section p {
+            margin: 2px 0;
+            font-size: 14px;
+        }
+
+        /* Items Table */
+        .invoice-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        .invoice-body th, .invoice-body td {
+            border: 1px solid #dee2e6;
+            padding: 12px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        .invoice-body th {
+            background-color: #007bff;
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .invoice-body tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .invoice-body tr:hover {
+            background-color: #e9ecef;
+        }
+
+        .invoice-body td:nth-child(4),
+        .invoice-body td:nth-child(5) {
+            text-align: right;
+        }
+
+        /* Summary Section */
+        .invoice-summary {
+            width: 300px;
+            margin-left: auto;
+            padding-top: 20px;
+            border-top: 2px solid #007bff;
+        }
+
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .total-item {
+            font-size: 20px;
+            font-weight: 700;
+            color: #007bff;
+            margin-top: 15px;
+        }
+
+        /* Footer Section */
+        .invoice-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 50px;
+            border-top: 1px solid #dee2e6;
+            padding-top: 20px;
+        }
+
+        .thank-you p {
+            margin: 0;
+            font-style: italic;
+            color: #666;
+        }
+
+        .signature {
+            text-align: right;
+        }
+
+        .signature p {
+            margin: 0;
+        }
+
+        .signature-line {
+            width: 200px;
+            height: 1px;
+            background-color: #333;
+            margin-top: 40px;
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                font-size: 12px;
+                color: #000;
+                background-color: #fff;
+            }
+            .invoice-container {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                max-width: 100%;
+            }
+            .invoice-header, .bill-to-section, .invoice-body, .invoice-summary, .invoice-footer {
+                padding: 0;
+                margin-bottom: 20px;
+            }
+            .invoice-header {
+                border-bottom: 1px solid #ccc;
+            }
+            .invoice-body th, .invoice-body td {
+                border: 1px solid #000;
+                padding: 8px;
+            }
+            .invoice-footer {
+                margin-top: 30px;
+            }
+            .invoice-summary {
+                width: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="invoice-container">
+        <!-- Header Section -->
+        <header class="invoice-header">
+            <div class="header-left">
+                <img src="{{logoBase64}}" alt="Company Logo" class="logo">
+                <div class="company-info">
+                    <h2>ADHVX INDUSTRIES</h2>
+                    <p>G5, 11th Street, IE South Phase, Ambattur,</p>
+                    <p>Chennai, Tamil Nadu 600058</p>
+                    <p>Phone: 9962022697</p>
+                    <p>Email: contact@adhvx.com</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <h1>QUOTE</h1>
+                <div class="invoice-details">
+                    <p><strong>Quote Number:</strong> {{quoteNumber}}</p>
+                    <p><strong>Date:</strong> {{date}}</p>
+                    <p><strong>Due Date:</strong> {{dueDate}}</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Bill To Section -->
+        <section class="bill-to-section">
+            <div class="bill-to-details">
+                <h3>Bill To:</h3>
+                <p><strong>{{customerName}}</strong></p>
+            </div>
+        </section>
+
+        <!-- Items Table -->
+        <main class="invoice-body">
+            <table>
+                <thead>
+                    <tr>
+                        <th>S.No</th>
+                        <th>Item Name</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Total Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{items}}
+                </tbody>
+            </table>
+        </main>
+
+        <!-- Summary Section -->
+        <div class="invoice-summary">
+            <div class="summary-item total-item">
+                <span>Final Total:</span>
+                <span><strong>{{finalTotal}}</strong></span>
+            </div>
+        </div>
+
+        <!-- Footer Section -->
+        <footer class="invoice-footer">
+            <div class="thank-you">
+                <p>Thank you for your business!</p>
+            </div>
+            <div class="signature">
+                <p>Authorized Signature:</p>
+                <div class="signature-line"></div>
+            </div>
+        </footer>
+    </div>
+
+</body>
+</html>
