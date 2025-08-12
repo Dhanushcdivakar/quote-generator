@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://quote-generator-backend-sigma.vercel.app',
+  baseURL:'https://quote-generator-backend-u6ue.onrender.com',
 });
 
 export async function generateQuoteAPI(formData) {
