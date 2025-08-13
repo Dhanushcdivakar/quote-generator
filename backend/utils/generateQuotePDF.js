@@ -6,21 +6,19 @@ let puppeteer = null;
 let chromium = null;
 let usingServerlessChromium = false;
 
-// Try to prefer serverless chrome (puppeteer-core + @sparticuz/chromium).
-// If that package set isn't available, fallback to local puppeteer.
 try {
-  // prefer serverless packages when available (these should be in production dependencies)
-  chromium = require('@sparticuz/chromium');
+  // Use chrome-aws-lambda for Vercel serverless environment
+  chromium = require('chrome-aws-lambda');
   puppeteer = require('puppeteer-core');
   usingServerlessChromium = true;
-  console.log('[generateQuotePDF] Using puppeteer-core + @sparticuz/chromium (serverless)');
+  console.log('[generateQuotePDF] Using puppeteer-core + chrome-aws-lambda (serverless)');
 } catch (err) {
   try {
     // local fallback for development (puppeteer should be installed locally as devDependency)
     puppeteer = require('puppeteer');
     console.log('[generateQuotePDF] Using full puppeteer (local dev fallback)');
   } catch (err2) {
-    console.error('[generateQuotePDF] No puppeteer package found. Install puppeteer locally for dev or ensure puppeteer-core + @sparticuz/chromium are in production dependencies.');
+    console.error('[generateQuotePDF] No puppeteer package found. Install puppeteer locally for dev or ensure puppeteer-core + chrome-aws-lambda are in production dependencies.');
     throw err2;
   }
 }
@@ -89,10 +87,9 @@ async function generateQuotePDF(data) {
     const launchOptions = { dumpio: true, timeout: 120000 };
 
     if (usingServerlessChromium && chromium) {
-      // Use the chromium package's defaults — do NOT append/override important args.
-      launchOptions.args = chromium.args || [];
-      // chromium.executablePath() returns appropriate path for serverless environment
-      launchOptions.executablePath = await chromium.executablePath();
+      // Use chrome-aws-lambda's recommended args and executablePath
+      launchOptions.args = chromium.args;
+      launchOptions.executablePath = await chromium.executablePath;
       launchOptions.headless = chromium.headless;
       launchOptions.defaultViewport = chromium.defaultViewport || { width: 1280, height: 800 };
       launchOptions.ignoreHTTPSErrors = true;
@@ -110,8 +107,7 @@ async function generateQuotePDF(data) {
     browser = await puppeteer.launch(launchOptions);
   } catch (e) {
     console.error('[generateQuotePDF] Failed to launch browser:', e && e.message ? e.message : e);
-    // Give a clear, actionable error message for logs
-    throw new Error(`Browser failed to launch. ${usingServerlessChromium ? 'If running on Vercel check that @sparticuz/chromium is in dependencies and the runtime env var is correct.' : 'If local, ensure you have puppeteer installed locally.'} Raw error: ${e.message || e}`);
+    throw new Error(`Browser failed to launch. ${usingServerlessChromium ? 'If running on Vercel check that chrome-aws-lambda is in dependencies and runtime env var is correct.' : 'If local, ensure you have puppeteer installed locally.'} Raw error: ${e.message || e}`);
   }
 
   try {
