@@ -3,14 +3,19 @@
   "builds": [
     {
       "src": "server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "memory": 3008
+      }
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/server.js",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+      "dest": "/server.js"
     }
-  ]
+  ],
+  "env": {
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
+  }
 }
