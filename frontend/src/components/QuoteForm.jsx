@@ -374,7 +374,7 @@ export default function QuoteForm() {
                     <div className="mt-8 flex justify-end">
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={true}
                             className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition duration-300 ease-in-out disabled:bg-gray-400"
                         >
                             {loading ? 'Generating...' : 'Export'}
